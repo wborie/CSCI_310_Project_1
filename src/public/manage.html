@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="./assets/css/manage.css" />
+    <link
+      rel="stylesheet"
+      href="https://use.fontawesome.com/releases/v5.7.2/css/all.css"
+      integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr"
+      crossorigin="anonymous"
+    />
+    <title>I'm Hungry</title>
+  </head>
+  <body>
+    <section>
+      <div class="container">
+        <div class="content-wrapper">
+          <div class="header-wrapper">
+            <div class="list-name text-center">
+              <h1 id="list-name-title">List Name</h1>
+            </div>
+            <div class="controls">
+              <div class="input-group">
+                <select class="custom-select" id="list-select">
+                  <option selected></option>
+                  <option value="To Explore">To Explore</option>
+                  <option value="Favorites">Favorites</option>
+                  <option value="Do Not Show">Do Not Show</option>
+                </select>
+                <button
+                  id="manage-list"
+                  type="button"
+                  class="btn btn-secondary"
+                >
+                  Manage List
+                </button>
+                <a href="results.html">
+                  <button type="button" class="btn btn-secondary" id="backToResultsButton">
+                    Back to Results
+                  </button>
+                </a>
+                <a href="search.html">
+                  <button type="button" class="btn btn-secondary" id="backToSearchButton">
+                    Back to Search
+                  </button>
+                </a>
+              </div>
+            </div>
+          </div>
+          <div id="results-list" class="reults-wrapper text-center"></div>
+        </div>
+      </div>
+    </section>
+  </body>
+  <script type="text/javascript">
+    let JSONObj = {};
+    let currentIndex = 0;
+
+    document.addEventListener("DOMContentLoaded", function() {
+      let listName = sessionStorage.getItem("listName");
+      document.getElementById("list-name-title").innerHTML = listName;
+      retrieveList();
+    });
+
+    document.getElementById("manage-list").onclick = function() {
+      let listName = document.getElementById("list-select").value;
+      if (listName !== "") {
+        sessionStorage.setItem("listName", listName);
+        location.href = "manage.html";
+      } else {
+        console.log("List not selected.");
+      }
+    };
+
+    function retrieveList() {
+      let xhttp = new XMLHttpRequest();
+      let listNameParameter = getListNameParameter(
+        sessionStorage.getItem("listName")
+      );
+      let parameters = "listName=" + listNameParameter;
+      xhttp.open("GET", "http://localhost:8080/getList?" + parameters, true);
+      xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+      xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4 && xhttp.status == 200) {
+          if (xhttp.responseText) {
+            JSONObj = JSON.parse(this.responseText);
+            populateList(listNameParameter);
+          }
+        }
+      };
+      xhttp.send();
+    }
+
+    function getListNameParameter(listName) {
+      if (listName === "Favorites") {
+        return "favorites";
+      } else if (listName === "To Explore") {
+        return "toExplore";
+      } else if (listName === "Do Not Show") {
+        return "doNotShow";
+      } else {
+        return "";
+      }
+    }
+
+    function populateList(listName) {
+      // Populate list using returned results
+      for (let idx in JSONObj[listName]) {
+        if (JSONObj[listName][idx]["type"] === "restaurant") {
+          addRestaurantCard(idx, listName);
+        } else {
+          addRecipeCard(idx, listName);
+        }
+        currentIndex++;
+      }
+    }
+
+    function addRestaurantCard(idx, listNameParameter) {
+      let resultsList = document.getElementById("results-list");
+      let newRow = document.createElement("div");
+      newRow.className = "row";
+
+      let newCardCol = document.createElement("div");
+      newCardCol.className = "col-8";
+      let newRemoveCol = document.createElement("div");
+      newRemoveCol.className = "col-2 icon-container";
+      let newRemoveIcon = document.createElement("i");
+      newRemoveIcon.className = "fas fa-times-circle fa-3x remove_" + currentIndex;
+      newRemoveIcon.id = "remove-" + JSONObj[listNameParameter][idx].uniqueId;
+      newRemoveIcon.onclick = function() {
+        let xhttp = new XMLHttpRequest();
+        let parameters =
+          "itemToRemoveId=" +
+          JSONObj[listNameParameter][idx].uniqueId +
+          "&originListName=" +
+          listNameParameter;
+        console.log(parameters);
+        xhttp.open(
+          "GET",
+          "http://localhost:8080/removeFromList?" + parameters,
+          true
+        );
+        xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+        xhttp.onreadystatechange = function() {
+          if (xhttp.readyState == 4 && xhttp.status == 200) {
+            if (xhttp.responseText) {
+              console.log(this.responseText);
+              location.reload();
+            }
+          }
+        };
+        xhttp.send();
+      };
+      newRemoveCol.appendChild(newRemoveIcon);
+      let newMoveCol = document.createElement("div");
+      newMoveCol.className = "col-2 icon-container";
+      let newMoveIcon = document.createElement("i");
+      newMoveIcon.className = "fas fa-exchange-alt fa-3x move_" + currentIndex;
+      newMoveIcon.id = "move-" + JSONObj[listNameParameter][idx].uniqueId;
+      newMoveIcon.onclick = function() {
+        let xhttp = new XMLHttpRequest();
+        let moveDest = document.getElementById(
+          "move-select-" + JSONObj[listNameParameter][idx].uniqueId
+        ).value;
+        let moveDestParam = getListNameParameter(moveDest);
+        if (moveDestParam != "") {
+          let parameters =
+            "itemToMoveId=" +
+            JSONObj[listNameParameter][idx].uniqueId +
+            "&originListName=" +
+            listNameParameter +
+            "&targetListName=" +
+            moveDestParam;
+          xhttp.open(
+            "GET",
+            "http://localhost:8080/moveBetweenLists?" + parameters,
+            true
+          );
+          xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+          xhttp.onreadystatechange = function() {
+            if (xhttp.readyState == 4 && xhttp.status == 200) {
+              if (xhttp.responseText) {
+                console.log(this.responseText);
+                location.reload();
+              }
+            }
+          };
+          xhttp.send();
+        }
+      };
+      let newMoveSelect = document.createElement("select");
+      newMoveSelect.className = "custom-select move_select_" + currentIndex;
+      newMoveSelect.id =
+        "move-select-" + JSONObj[listNameParameter][idx].uniqueId;
+      let chooseOneOption = document.createElement("option");
+      chooseOneOption.selected = true;
+      chooseOneOption.innerHTML = "";
+      let toExploreOption = document.createElement("option");
+      toExploreOption.value = "To Explore";
+      toExploreOption.innerHTML = "To Explore";
+      let favoritesOption = document.createElement("option");
+      favoritesOption.value = "Favorites";
+      favoritesOption.innerHTML = "Favorites";
+      let doNotShowOption = document.createElement("option");
+      doNotShowOption.value = "Do Not Show";
+      doNotShowOption.innerHTML = "Do Not Show";
+      newMoveSelect.appendChild(chooseOneOption);
+      newMoveSelect.appendChild(toExploreOption);
+      newMoveSelect.appendChild(favoritesOption);
+      newMoveSelect.appendChild(doNotShowOption);
+      newMoveCol.appendChild(newMoveSelect);
+      newMoveCol.appendChild(newMoveIcon);
+      newMoveCol.style.flexDirection = "column";
+
+      let newCard = document.createElement("div");
+
+      if (idx % 2 === 0) {
+        newCard.className = "card text-white bg-secondary mb-3 restaurant-card card_" + currentIndex;
+      } else {
+        newCard.className = "card text-white bg-dark mb-3 restaurant-card card_" + currentIndex;
+      }
+      let newCardBody = document.createElement("div");
+      newCardBody.className = "card-body";
+      let newCardBodyRow = document.createElement("div");
+      newCardBodyRow.className = "row";
+
+      let restaurantNameCol = document.createElement("div");
+      restaurantNameCol.className = "col-5";
+      let restaurantName = document.createElement("h5");
+      restaurantName.className = "card-title restaurant-name";
+      restaurantName.innerHTML = JSONObj[listNameParameter][idx].name;
+      let restaurantDrivingTime = document.createElement("h6");
+      restaurantDrivingTime.innerHTML =
+        "Driving Time: " + JSONObj[listNameParameter][idx].drivingTime;
+      restaurantNameCol.appendChild(restaurantName);
+      restaurantNameCol.appendChild(restaurantDrivingTime);
+
+      let restaurantRatingCol = document.createElement("div");
+      restaurantRatingCol.className = "col-5";
+      let restaurantRating = document.createElement("div");
+      restaurantRating.className = "stars card-title";
+      restaurantRatingValue = JSONObj[listNameParameter][idx].rating;
+      restaurantRating.innerHTML =
+        restaurantRatingValue + `<i class="fas fa-star" />`;
+      let restaurantAddress = document.createElement("h6");
+      restaurantAddress.innerHTML = JSONObj[listNameParameter][idx].address;
+      restaurantRatingCol.appendChild(restaurantRating);
+      restaurantRatingCol.append(restaurantAddress);
+
+      let restaurantPriceCol = document.createElement("div");
+      restaurantPriceCol.className = "col-2";
+      let restaurantPriceLevel = document.createElement("h6");
+      restaurantPriceLevel.className = "card-title";
+      let restaurantPriceLevelValue =
+        JSONObj[listNameParameter][idx].priceLevel;
+      let priceString = "";
+      for (let i = 0; i < restaurantPriceLevelValue; i++) {
+        priceString += `<i class="fas fa-dollar-sign"></i>`;
+      }
+      restaurantPriceLevel.innerHTML = priceString;
+      restaurantPriceCol.appendChild(restaurantPriceLevel);
+
+      newCardBodyRow.appendChild(restaurantNameCol);
+      newCardBodyRow.appendChild(restaurantRatingCol);
+      newCardBodyRow.appendChild(restaurantPriceCol);
+      newCardBody.appendChild(newCardBodyRow);
+      newCard.appendChild(newCardBody);
+      newCard.style.cursor = "pointer";
+      newCard.onclick = function() {
+        let currentItem = JSONObj[listNameParameter][idx];
+        sessionStorage.setItem("currentItem", JSON.stringify(currentItem));
+        location.href = "restaurant.html";
+      };
+
+      newCardCol.appendChild(newCard);
+      newRow.appendChild(newCardCol);
+      newRow.appendChild(newRemoveCol);
+      newRow.append(newMoveCol);
+
+      resultsList.append(newRow);
+    }
+
+    function addRecipeCard(idx, listNameParameter) {
+      let resultsList = document.getElementById("results-list");
+      let newRow = document.createElement("div");
+      newRow.className = "row";
+
+      let newCardCol = document.createElement("div");
+      newCardCol.className = "col-8";
+      let newRemoveCol = document.createElement("div");
+      newRemoveCol.className = "col-2 icon-container";
+      let newRemoveIcon = document.createElement("i");
+      newRemoveIcon.className = "fas fa-times-circle fa-3x remove_" + currentIndex;
+      newRemoveIcon.id = "remove-" + JSONObj[listNameParameter][idx].uniqueId;
+      newRemoveIcon.onclick = function() {
+        let xhttp = new XMLHttpRequest();
+        let parameters =
+          "itemToRemoveId=" +
+          JSONObj[listNameParameter][idx].uniqueId +
+          "&originListName=" +
+          listNameParameter;
+        xhttp.open(
+          "GET",
+          "http://localhost:8080/removeFromList?" + parameters,
+          true
+        );
+        xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+        xhttp.onreadystatechange = function() {
+          if (xhttp.readyState == 4 && xhttp.status == 200) {
+            if (xhttp.responseText) {
+              console.log(this.responseText);
+              location.reload();
+            }
+          }
+        };
+        xhttp.send();
+      };
+      newRemoveCol.appendChild(newRemoveIcon);
+      let newMoveCol = document.createElement("div");
+      newMoveCol.className = "col-2 icon-container";
+      let newMoveIcon = document.createElement("i");
+      newMoveIcon.className = "fas fa-exchange-alt fa-3x move_" + currentIndex;
+      newMoveIcon.id = "move-" + JSONObj[listNameParameter][idx].uniqueId;
+      newMoveIcon.onclick = function() {
+        let xhttp = new XMLHttpRequest();
+        let moveDest = document.getElementById(
+          "move-select-" + JSONObj[listNameParameter][idx].uniqueId
+        ).value;
+        let moveDestParam = getListNameParameter(moveDest);
+        if (moveDestParam != "") {
+          let parameters =
+            "itemToMoveId=" +
+            JSONObj[listNameParameter][idx].uniqueId +
+            "&originListName=" +
+            listNameParameter +
+            "&targetListName=" +
+            moveDestParam; // Change later
+          xhttp.open(
+            "GET",
+            "http://localhost:8080/moveBetweenLists?" + parameters,
+            true
+          );
+          xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+          xhttp.onreadystatechange = function() {
+            if (xhttp.readyState == 4 && xhttp.status == 200) {
+              if (xhttp.responseText) {
+                console.log(this.responseText);
+                location.reload();
+              }
+            }
+          };
+          xhttp.send();
+        }
+      };
+      let newMoveSelect = document.createElement("select");
+      newMoveSelect.className = "custom-select move_select_" + currentIndex;
+      newMoveSelect.id =
+        "move-select-" + JSONObj[listNameParameter][idx].uniqueId;
+      let chooseOneOption = document.createElement("option");
+      chooseOneOption.selected = true;
+      chooseOneOption.innerHTML = "";
+      let toExploreOption = document.createElement("option");
+      toExploreOption.value = "To Explore";
+      toExploreOption.innerHTML = "To Explore";
+      let favoritesOption = document.createElement("option");
+      favoritesOption.value = "Favorites";
+      favoritesOption.innerHTML = "Favorites";
+      let doNotShowOption = document.createElement("option");
+      doNotShowOption.value = "Do Not Show";
+      doNotShowOption.innerHTML = "Do Not Show";
+      newMoveSelect.appendChild(chooseOneOption);
+      newMoveSelect.appendChild(toExploreOption);
+      newMoveSelect.appendChild(favoritesOption);
+      newMoveSelect.appendChild(doNotShowOption);
+      newMoveCol.appendChild(newMoveSelect);
+      newMoveCol.appendChild(newMoveIcon);
+      newMoveCol.style.flexDirection = "column";
+
+      let newCard = document.createElement("div");
+      newCard.id = JSONObj[listNameParameter][idx].uniqueId;
+      if (idx % 2 === 0) {
+        newCard.className = "card text-white bg-secondary mb-3 recipe-card card_" + currentIndex;
+      } else {
+        newCard.className = "card text-white bg-dark mb-3 recipe-card card_" + currentIndex;
+      }
+      let newCardBody = document.createElement("div");
+      newCardBody.className = "card-body";
+      let newCardBodyRow = document.createElement("div");
+      newCardBodyRow.className = "row";
+
+      let recipeNameCol = document.createElement("div");
+      recipeNameCol.className = "col";
+      let recipeName = document.createElement("h5");
+      recipeName.className = "card-title";
+      recipeName.innerHTML = JSONObj[listNameParameter][idx].name;
+      let recipePrepTime = document.createElement("h6");
+      recipePrepTime.innerHTML =
+        "Prep Time: " + JSONObj[listNameParameter][idx].prepTime + " mins";
+      recipeNameCol.appendChild(recipeName);
+      recipeNameCol.appendChild(recipePrepTime);
+
+      let recipeRatingCol = document.createElement("div");
+      recipeRatingCol.className = "col";
+      let recipeRating = document.createElement("div");
+      recipeRating.className = "stars card-title";
+      recipeRatingValue = (JSONObj[listNameParameter][idx].rating / 100) * 5;
+      recipeRating.innerHTML =
+        recipeRatingValue.toFixed(2) + `<i class="fas fa-star"></i>`;
+      let recipeCookTime = document.createElement("h6");
+      recipeCookTime.innerHTML =
+        "Cook Time: " + JSONObj[listNameParameter][idx].cookTime + " mins";
+      recipeRatingCol.appendChild(recipeRating);
+      recipeRatingCol.append(recipeCookTime);
+
+      newCardBodyRow.appendChild(recipeNameCol);
+      newCardBodyRow.appendChild(recipeRatingCol);
+      newCardBody.appendChild(newCardBodyRow);
+      newCard.appendChild(newCardBody);
+      newCard.style.cursor = "pointer";
+      newCard.onclick = function() {
+        let currentItem = JSONObj[listNameParameter][idx];
+        sessionStorage.setItem("currentItem", JSON.stringify(currentItem));
+        location.href = "recipe.html";
+      };
+
+      newCardCol.appendChild(newCard);
+      newRow.appendChild(newCardCol);
+      newRow.appendChild(newRemoveCol);
+      newRow.append(newMoveCol);
+
+      resultsList.append(newRow);
+    }
+  </script>
+  <script src="./assets/js/bootstrap.min.js" charset="utf-8"></script>
+</html>
